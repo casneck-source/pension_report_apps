@@ -10,6 +10,7 @@
 import hmac
 import json
 import os
+import re
 from datetime import date
 
 import anthropic
@@ -100,7 +101,7 @@ SYSTEM_PROMPT = """너는 증권사 연금RM(법인 퇴직연금 영업) 부서�
 팀원이 법인명과 간단한 키워드만 적어 준 메모를 받아, 팀장님께 카카오톡으로 올리는 '일일 활동보고'를 우리 팀이 실제로 쓰는 양식으로 그럴듯하고 충실하게 완성한다.
 
 # 출력 양식 (반드시 이 형태)
-첫 줄: 보고자 머리말 (예: "2팀 홍길동 수석 (2026.10.21)") — 사용자가 준 작성자/일자를 그대로 사용
+첫 줄: 보고자 머리말 (예: "2팀 홍길동 수석 (2026.10.21)") — 사용자가 준 작성자/일자를 그대로 사용. 보고 일자가 "표시 안 함"이면 날짜 없이 작성자만 쓴다 (예: "2팀 홍길동 수석")
 빈 줄 하나 뒤, 메모에 나온 법인을 등장 순서대로 "1. 법인명", "2. 법인명" … 으로 번호를 매겨 쓴다.
 - 법인이 1곳이면 "1. 법인명" 하나만, 2곳이면 "1. 법인명" / "2. 법인명" 두 개를 쓴다. 메모에 없는 법인을 추가하지 않는다.
 - 법인 상태를 알 수 있으면 괄호로 붙인다: "1. A화학(미도입)", "2. B제약(신규)"
@@ -195,12 +196,15 @@ FEW_SHOT_ASSISTANT = """2팀 홍길동 수석 (2026.10.21)
 - 차주 경영성과급DC 제안서 발송 예정"""
 
 
-def build_user_message(report_date: date, author: str, memo: str) -> str:
-    date_str = f"{report_date:%Y.%m.%d} ({WEEKDAYS[report_date.weekday()]})"
+def build_user_message(report_date: date | None, author: str, memo: str) -> str:
+    if report_date is None:
+        date_str = "표시 안 함 (머리말에 날짜를 넣지 말 것)"
+    else:
+        date_str = f"{report_date:%Y.%m.%d} ({WEEKDAYS[report_date.weekday()]})"
     return f"보고 일자: {date_str}\n작성자: {author}\n\n활동 메모:\n{memo.strip()}"
 
 
-def stream_report(api_key: str, report_date: date, author: str, memo: str):
+def stream_report(api_key: str, report_date: date | None, author: str, memo: str):
     """Claude 응답을 글자 단위로 흘려보내는 제너레이터 (st.write_stream 용)."""
     # 조직 전체용(워크스페이스 미지정) API 키는 워크스페이스 ID 를 함께 보내야 함
     workspace_id = get_setting("ANTHROPIC_WORKSPACE_ID")
@@ -236,6 +240,11 @@ def stream_report(api_key: str, report_date: date, author: str, memo: str):
         raise RuntimeError("AI가 이 요청에 대한 응답을 거절했습니다. 메모 내용을 확인해 주세요.")
     if final.stop_reason == "max_tokens":
         st.warning("보고서가 너무 길어 일부가 잘렸을 수 있습니다. 메모를 나눠서 생성해 보세요.")
+
+
+def normalize_bullets(text: str) -> str:
+    """줄 앞 글머리표를 모두 '-' 로 통일 (•, ·, ● 등이 섞여 나와도 복사 시 '-' 로 붙도록)."""
+    return re.sub(r"(?m)^([ \t]*)[•●·▪◦‐‑–—][ \t]*", r"\1- ", text).strip()
 
 
 def copy_button(text: str) -> None:
@@ -301,7 +310,9 @@ if not api_key:
 
 col1, col2 = st.columns(2)
 with col1:
-    report_date = st.date_input("📅 보고 일자", value=date.today(), format="YYYY.MM.DD")
+    picked_date = st.date_input("📅 보고 일자", value=date.today(), format="YYYY.MM.DD")
+    include_date = st.toggle("보고서에 일자 넣기", value=True, help="끄면 머리말에 날짜 없이 작성자만 표시됩니다.")
+    report_date = picked_date if include_date else None
 with col2:
     author = st.text_input("✍️ 작성자", placeholder="예: 2팀 홍길동 수석")
 
@@ -323,11 +334,17 @@ if st.button("🚀 팀장님 보고서 생성하기", type="primary", use_contai
     else:
         try:
             with st.status("보고서를 작성하고 있습니다...", expanded=True) as status:
-                result = st.write_stream(stream_report(api_key, report_date, author.strip(), memo))
+                # 마크다운으로 그리면 "- " 줄이 까만 점(•) 목록으로 바뀌므로 순수 텍스트로 표시
+                preview = st.empty()
+                result = ""
+                for chunk in stream_report(api_key, report_date, author.strip(), memo):
+                    result += chunk
+                    preview.code(result, language=None, wrap_lines=True)
                 status.update(label="작성 완료!", state="complete", expanded=False)
-            st.session_state["report"] = result.strip()
-            st.session_state["report_editor"] = result.strip()  # 새 결과로 편집창 갱신
-            st.session_state["report_date"] = report_date
+            result = normalize_bullets(result)
+            st.session_state["report"] = result
+            st.session_state["report_editor"] = result  # 새 결과로 편집창 갱신
+            st.session_state["report_date"] = picked_date
             st.session_state["report_author"] = author.strip()
         except anthropic.AuthenticationError as e:
             st.error("API 키가 올바르지 않습니다. ANTHROPIC_API_KEY 를 확인해 주세요.")
