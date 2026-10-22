@@ -31,15 +31,36 @@ st.set_page_config(
 )
 
 
+SECRETS_ERROR: str | None = None  # Secrets 형식 오류가 있으면 화면에 안내하기 위해 저장
+
+
+def _clean(value) -> str | None:
+    """앞뒤 공백·따옴표(복사 실수로 들어간 “ ” 포함)를 정리."""
+    if value is None:
+        return None
+    value = str(value).strip().strip('"\'“”‘’').strip()
+    return value or None
+
+
 def get_setting(name: str) -> str | None:
     """로컬은 .env, Streamlit Cloud 배포 시에는 Secrets 에서 설정값을 읽어옴."""
-    value = os.getenv(name)
+    global SECRETS_ERROR
+    value = _clean(os.getenv(name))
     if value:
         return value
     try:
-        return st.secrets.get(name)
-    except Exception:  # secrets.toml 이 아예 없는 경우
-        return None
+        secrets = st.secrets
+        if name in secrets:
+            return _clean(secrets[name])
+        # [anthropic] 처럼 섹션 안에 넣은 경우도 찾아줌
+        for section in secrets.values():
+            if hasattr(section, "get") and section.get(name):
+                return _clean(section.get(name))
+    except Exception as e:
+        # secrets 가 아예 없으면(로컬 실행) 조용히 넘어가고, 형식 오류(따옴표 누락 등)만 안내
+        if "pars" in str(e).lower():
+            SECRETS_ERROR = str(e).split(":", 1)[-1].strip() if "secrets.toml" in str(e) else str(e)
+    return None
 
 
 def get_api_key() -> str | None:
@@ -268,9 +289,12 @@ st.caption("오늘 한 일을 키워드로 대충 적어도, 팀장님 제출용
 api_key = get_api_key()
 if not api_key:
     st.error(
-        "ANTHROPIC_API_KEY 가 설정되지 않았습니다. "
-        "로컬은 `.env` 파일, Streamlit Cloud 는 App settings → Secrets 에 키를 넣어 주세요."
+        "ANTHROPIC_API_KEY 가 설정되지 않아 생성 버튼이 꺼져 있습니다. "
+        "로컬은 `.env` 파일, Streamlit Cloud 는 Manage app → Settings → Secrets 에 아래처럼 넣고 Save 를 눌러 주세요."
     )
+    st.code('ANTHROPIC_API_KEY = "sk-ant-..."\nAPP_PASSWORD = "팀비밀번호"', language="toml")
+    if SECRETS_ERROR:
+        st.warning(f"Secrets 형식에 오류가 있습니다. 값 양쪽에 큰따옴표(\")가 있는지 확인해 주세요.\n\n상세: {SECRETS_ERROR}")
 
 col1, col2 = st.columns(2)
 with col1:
