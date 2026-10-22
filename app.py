@@ -202,7 +202,10 @@ def build_user_message(report_date: date, author: str, memo: str) -> str:
 
 def stream_report(api_key: str, report_date: date, author: str, memo: str):
     """Claude 응답을 글자 단위로 흘려보내는 제너레이터 (st.write_stream 용)."""
-    client = anthropic.Anthropic(api_key=api_key)
+    # 조직 전체용(워크스페이스 미지정) API 키는 워크스페이스 ID 를 함께 보내야 함
+    workspace_id = get_setting("ANTHROPIC_WORKSPACE_ID")
+    headers = {"anthropic-workspace-id": workspace_id} if workspace_id else None
+    client = anthropic.Anthropic(api_key=api_key, default_headers=headers)
     request = dict(
         model=MODEL,
         max_tokens=8000,
@@ -336,7 +339,13 @@ if st.button("🚀 팀장님 보고서 생성하기", type="primary", use_contai
             st.caption(f"상세: {e}")
         except anthropic.APIStatusError as e:
             detail = str(e.message)
-            if "credit balance" in detail.lower():
+            if "scoped to a workspace" in detail.lower():
+                st.error(
+                    "이 API 키는 특정 워크스페이스에 속하지 않은 키입니다. console.anthropic.com → API Keys 에서 "
+                    "키를 만들 때 워크스페이스(예: Default)를 선택해 새 키를 발급하거나, "
+                    "Secrets 에 ANTHROPIC_WORKSPACE_ID = \"wrkspc_...\" 를 추가해 주세요."
+                )
+            elif "credit balance" in detail.lower():
                 st.error(
                     "API 계정의 충전 잔액이 부족합니다. console.anthropic.com → Settings → Billing 에서 "
                     "결제 수단을 등록하고 크레딧을 충전한 뒤 다시 시도해 주세요. (claude.ai 구독과는 별도입니다)"
