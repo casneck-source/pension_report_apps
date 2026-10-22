@@ -182,22 +182,32 @@ def build_user_message(report_date: date, author: str, memo: str) -> str:
 def stream_report(api_key: str, report_date: date, author: str, memo: str):
     """Claude 응답을 글자 단위로 흘려보내는 제너레이터 (st.write_stream 용)."""
     client = anthropic.Anthropic(api_key=api_key)
-    with client.beta.messages.stream(
+    request = dict(
         model=MODEL,
         max_tokens=8000,
         system=SYSTEM_PROMPT,
         output_config={"effort": "medium"},
-        # 안전 필터로 거절될 경우 서버가 자동으로 다른 모델로 재시도
-        betas=["server-side-fallback-2026-07-01"],
-        fallbacks="default",
         messages=[
             {"role": "user", "content": FEW_SHOT_USER},
             {"role": "assistant", "content": FEW_SHOT_ASSISTANT},
             {"role": "user", "content": build_user_message(report_date, author, memo)},
         ],
-    ) as stream:
+    )
+    try:
+        # 안전 필터로 거절될 경우 서버가 자동으로 다른 모델로 재시도 (베타 기능)
+        stream_ctx = client.beta.messages.stream(
+            **request, betas=["server-side-fallback-2026-07-01"], fallbacks="default"
+        )
+        stream = stream_ctx.__enter__()
+    except anthropic.BadRequestError:
+        # 계정에서 베타 기능을 쓸 수 없으면 일반 요청으로 다시 시도
+        stream_ctx = client.messages.stream(**request)
+        stream = stream_ctx.__enter__()
+    try:
         yield from stream.text_stream
         final = stream.get_final_message()
+    finally:
+        stream_ctx.__exit__(None, None, None)
     if final.stop_reason == "refusal":
         raise RuntimeError("AI가 이 요청에 대한 응답을 거절했습니다. 메모 내용을 확인해 주세요.")
     if final.stop_reason == "max_tokens":
@@ -292,14 +302,17 @@ if st.button("🚀 팀장님 보고서 생성하기", type="primary", use_contai
             st.session_state["report_editor"] = result.strip()  # 새 결과로 편집창 갱신
             st.session_state["report_date"] = report_date
             st.session_state["report_author"] = author.strip()
-        except anthropic.AuthenticationError:
+        except anthropic.AuthenticationError as e:
             st.error("API 키가 올바르지 않습니다. ANTHROPIC_API_KEY 를 확인해 주세요.")
+            st.caption(f"상세: {e.message}")
         except anthropic.RateLimitError:
             st.error("요청이 많아 잠시 제한되었습니다. 1분 후 다시 시도해 주세요.")
-        except anthropic.APIConnectionError:
-            st.error("네트워크 연결에 실패했습니다. 인터넷 연결을 확인해 주세요.")
+        except anthropic.APIConnectionError as e:
+            st.error("AI 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.")
+            st.caption(f"상세: {e}")
         except anthropic.APIStatusError as e:
-            st.error(f"AI 서버 오류가 발생했습니다 ({e.status_code}). 잠시 후 다시 시도해 주세요.")
+            st.error(f"AI 서버 오류가 발생했습니다 ({e.status_code}). 아래 상세 내용을 캡처해 주세요.")
+            st.caption(f"상세: {e.message}")
         except RuntimeError as e:
             st.error(str(e))
 
