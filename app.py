@@ -335,8 +335,15 @@ if st.button("🚀 팀장님 보고서 생성하기", type="primary", use_contai
             st.error("AI 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.")
             st.caption(f"상세: {e}")
         except anthropic.APIStatusError as e:
-            st.error(f"AI 서버 오류가 발생했습니다 ({e.status_code}). 아래 상세 내용을 캡처해 주세요.")
-            st.caption(f"상세: {e.message}")
+            detail = str(e.message)
+            if "credit balance" in detail.lower():
+                st.error(
+                    "API 계정의 충전 잔액이 부족합니다. console.anthropic.com → Settings → Billing 에서 "
+                    "결제 수단을 등록하고 크레딧을 충전한 뒤 다시 시도해 주세요. (claude.ai 구독과는 별도입니다)"
+                )
+            else:
+                st.error(f"AI 서버 오류가 발생했습니다 ({e.status_code}). 아래 상세 내용을 캡처해 주세요.")
+            st.caption(f"상세: {detail}")
         except RuntimeError as e:
             st.error(str(e))
 
