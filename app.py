@@ -247,6 +247,13 @@ def normalize_bullets(text: str) -> str:
     return re.sub(r"(?m)^([ \t]*)[•●·▪◦‐‑–—][ \t]*", r"\1- ", text).strip()
 
 
+def for_kakao(text: str, attached: bool = False) -> str:
+    """카톡은 줄 앞 '- '(하이픈+공백)를 글머리 기호(•)로 바꿔 보여줌.
+    공백을 모양이 같은 줄바꿈 없는 공백(NBSP)으로 바꾸거나, 공백 없이 붙여 써서 자동 변환을 피함."""
+    replacement = r"\1-" if attached else "\\1-\u00a0"
+    return re.sub(r"(?m)^([ \t]*)- ", replacement, text)
+
+
 def copy_button(text: str) -> None:
     """원클릭 클립보드 복사 버튼 (HTML + JS)."""
     # "<" 를 이스케이프해 보고서 안의 문자열이 <script> 태그를 깨뜨리지 않도록 함
@@ -383,9 +390,15 @@ if "report" in st.session_state:
         key="report_editor",
     )
 
+    copy_style = st.radio(
+        "복사 형식",
+        ["- 내용 (기본)", "-내용 (붙여쓰기)"],
+        horizontal=True,
+        help="카톡에 붙였을 때 '-'가 까만 점으로 바뀌면 '붙여쓰기'를 선택하세요.",
+    )
     b1, b2 = st.columns(2)
     with b1:
-        copy_button(final_text)
+        copy_button(for_kakao(final_text, attached=copy_style.startswith("-내용")))
     with b2:
         d = st.session_state["report_date"]
         st.download_button(
