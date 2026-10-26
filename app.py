@@ -309,8 +309,14 @@ def for_kakao(text: str, dots: bool = False) -> str:
     """카톡은 줄 앞 '- '(하이픈+공백)를 글머리 기호(•)로 바꿔 보여줌.
     '-' 로 보이게 할 때는 공백을 모양이 같은 줄바꿈 없는 공백(NBSP)으로 바꿔 자동 변환을 피하고,
     까만 점으로 보이게 할 때는 '•' 문자로 바꿔 어디에 붙여도 점으로 나오게 함."""
-    replacement = "\\1• " if dots else "\\1-\u00a0"
-    return re.sub(r"(?m)^([ \t]*)- ", replacement, text)
+    if dots:
+        return re.sub(r"(?m)^([ \t]*)-[ \u00a0]", "\\1• ", text)
+    return re.sub(r"(?m)^([ \t]*)- ", "\\1-\u00a0", text)
+
+
+def plain_text(text: str) -> str:
+    """파일 저장용: 카톡용 특수 공백(NBSP)을 일반 공백으로 되돌림."""
+    return text.replace("\u00a0", " ")
 
 
 def copy_button(text: str) -> None:
@@ -414,7 +420,8 @@ if st.button("🚀 팀장님 보고서 생성하기", type="primary", use_contai
             cases = split_cases(result)
             st.session_state["cases"] = cases
             for num, body in cases.items():
-                st.session_state[f"case_editor_{num}"] = body  # 새 결과로 편집창 갱신
+                # 화면 글 자체에 카톡용 하이픈을 넣어, 복사 버튼이 아니라 직접 드래그·Ctrl+C 로 복사해도 '-' 로 붙게 함
+                st.session_state[f"case_editor_{num}"] = for_kakao(body)
             st.session_state["report_date"] = picked_date
             st.session_state["report_author"] = author.strip()
         except anthropic.AuthenticationError as e:
@@ -479,7 +486,7 @@ if "cases" in st.session_state:
             with b2:
                 st.download_button(
                     "💾 .txt 파일 다운로드",
-                    data=text.encode("utf-8"),
+                    data=plain_text(text).encode("utf-8"),
                     file_name=f"일일보고_{d:%Y%m%d}_{who}_사례{num}.txt",
                     mime="text/plain",
                     use_container_width=True,
