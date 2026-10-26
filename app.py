@@ -127,6 +127,16 @@ SYSTEM_PROMPT = """너는 증권사 연금RM(법인 퇴직연금 영업) 부서�
 - 축약어는 풀어 쓰되(예: "디옵" → "디폴트옵션"), 회사명·인명·숫자는 메모 그대로 둔다.
 - 인사말, 설명, 마크다운 기호(#, **, 표, 코드블록)를 쓰지 않는다. 카카오톡에 그대로 붙여넣을 순수 텍스트 보고서만 출력한다.
 
+# 3가지 버전으로 작성
+같은 메모로 보고서를 3가지 버전으로 쓴다. 세 버전 모두 위 양식(머리말, "1. 법인명", "- " 개조식)과 사실 관계는 똑같이 지키고, 표현만 다르게 한다.
+- 사례 1 (정석형): 우리 팀 기존 보고 문체 그대로. 업계 용어 중심의 표준 보고체.
+- 사례 2 (쉬운 표현형): 같은 내용을 더 쉬운 단어로 풀어 쓴다. 전문용어는 뜻이 드러나게 풀고(예: "디폴트옵션" → "디폴트옵션(사전지정운용)"), 어감은 부드럽게. 종결은 "~함 / ~예정" 등 개조식 유지.
+- 사례 3 (간결·핵심형): 다른 어투로 짧고 단단하게. 핵심 성과나 고객 반응을 먼저 쓰고, 한 법인당 2~4줄, 단어 선택도 사례 1·2와 겹치지 않게 바꾼다.
+각 버전 앞에는 다음 구분선을 한 줄로 쓰고, 구분선 외에는 다른 설명을 붙이지 않는다.
+===사례 1===
+===사례 2===
+===사례 3===
+
 # 참고: 팀이 실제로 올린 보고 문체 예시 (가명 처리)
 <style_examples>
 2팀 김OO 수석
@@ -165,7 +175,7 @@ SYSTEM_PROMPT = """너는 증권사 연금RM(법인 퇴직연금 영업) 부서�
 - 2027년 영업관리 작성 지속
 </style_examples>"""
 
-# 입력 → 최종 출력 Few-shot 예시 (법인별 번호 양식 시연용)
+# 입력 → 최종 출력 Few-shot 예시 (법인별 번호 양식 + 3가지 버전 시연용)
 FEW_SHOT_USER = """보고 일자: 2026.10.21 (수)
 작성자: 2팀 홍길동 수석
 
@@ -175,7 +185,8 @@ I물류 사무담당자 통화 dc 수익률 급락 민원 직원설명회 요청
 J바이오 미도입 대표님 중식 경영성과급dc 관심, 다음주 제안서 보내기로
 내일 I물류 설명회 날짜 확정 전화"""
 
-FEW_SHOT_ASSISTANT = """2팀 홍길동 수석 (2026.10.21)
+FEW_SHOT_ASSISTANT = """===사례 1===
+2팀 홍길동 수석 (2026.10.21)
 
 1. H전자
 - 방문 / 인사팀장 미팅 (w. 노무사 동행)
@@ -193,7 +204,44 @@ FEW_SHOT_ASSISTANT = """2팀 홍길동 수석 (2026.10.21)
 - 중식 / 대표이사
 - 경영성과급DC 제도 도입에 관심 표명함
 - 제도 개요 및 도입 절차 안내
-- 차주 경영성과급DC 제안서 발송 예정"""
+- 차주 경영성과급DC 제안서 발송 예정
+===사례 2===
+2팀 홍길동 수석 (2026.10.21)
+
+1. H전자
+- 방문 / 인사팀장 미팅 (w. 노무사 동행)
+- DC 디폴트옵션(사전지정운용) 운영 방식과 규약 변경 방법 설명함
+- 다른 금융사에 있는 DC 적립금(약 30억)을 당사로 옮기는 것에 긍정적인 반응
+- 옮기는 절차와 걸리는 기간을 정리한 자료 보내드릴 예정
+
+2. I물류
+- 유선 / 사무담당자
+- 최근 DC 수익률이 크게 떨어져 직원 불만이 많다고 함
+- 직원들을 위한 설명회를 열어 달라는 요청 받음
+- 내일 다시 연락해 설명회 날짜 정하고, 수익률 현황과 대응 방법 자료 준비 예정
+
+3. J바이오(미도입)
+- 중식 / 대표이사
+- 성과급을 퇴직연금(DC)에 넣는 경영성과급DC 제도에 관심 보임
+- 제도 내용과 도입 순서 간단히 설명함
+- 다음 주 제안서 보내드릴 예정
+===사례 3===
+2팀 홍길동 수석 (2026.10.21)
+
+1. H전자
+- 방문 / 인사팀장 (w. 노무사)
+- 타사 DC 30억 당사 이전 긍정 검토
+- 디폴트옵션 규약 변경 사항 설명 완료, 이전 절차 자료 송부 예정
+
+2. I물류
+- 유선 / 사무담당자
+- DC 수익률 하락 관련 가입자 민원 발생, 직원 설명회 요청
+- 익일 일정 확정 위해 재통화 예정
+
+3. J바이오(미도입)
+- 중식 / 대표이사
+- 경영성과급DC 도입 관심 확인
+- 차주 제안서 발송 예정"""
 
 
 def build_user_message(report_date: date | None, author: str, memo: str) -> str:
@@ -212,7 +260,7 @@ def stream_report(api_key: str, report_date: date | None, author: str, memo: str
     client = anthropic.Anthropic(api_key=api_key, default_headers=headers)
     request = dict(
         model=MODEL,
-        max_tokens=8000,
+        max_tokens=16000,
         system=SYSTEM_PROMPT,
         output_config={"effort": "medium"},
         messages=[
@@ -245,6 +293,16 @@ def stream_report(api_key: str, report_date: date | None, author: str, memo: str
 def normalize_bullets(text: str) -> str:
     """줄 앞 글머리표를 모두 '-' 로 통일 (•, ·, ● 등이 섞여 나와도 복사 시 '-' 로 붙도록)."""
     return re.sub(r"(?m)^([ \t]*)[•●·▪◦‐‑–—][ \t]*", r"\1- ", text).strip()
+
+
+CASE_LABELS = {1: "사례 1 · 정석형", 2: "사례 2 · 쉬운 표현", 3: "사례 3 · 간결·핵심"}
+
+
+def split_cases(text: str) -> dict[int, str]:
+    """'===사례 N===' 구분선으로 3가지 버전을 나눔. 구분선이 없으면 전체를 사례 1로."""
+    parts = re.split(r"(?m)^[ \t]*=+[ \t]*사례[ \t]*([123])[ \t]*=+[ \t]*$", text)
+    cases = {int(num): normalize_bullets(body) for num, body in zip(parts[1::2], parts[2::2]) if body.strip()}
+    return cases or {1: normalize_bullets(text)}
 
 
 def for_kakao(text: str, dots: bool = False) -> str:
@@ -345,7 +403,7 @@ if st.button("🚀 팀장님 보고서 생성하기", type="primary", use_contai
         st.warning("활동 메모를 입력해 주세요.")
     else:
         try:
-            with st.status("보고서를 작성하고 있습니다...", expanded=True) as status:
+            with st.status("보고서 3가지 버전을 작성하고 있습니다...", expanded=True) as status:
                 # 마크다운으로 그리면 "- " 줄이 까만 점(•) 목록으로 바뀌므로 순수 텍스트로 표시
                 preview = st.empty()
                 result = ""
@@ -353,9 +411,10 @@ if st.button("🚀 팀장님 보고서 생성하기", type="primary", use_contai
                     result += chunk
                     preview.code(result, language=None, wrap_lines=True)
                 status.update(label="작성 완료!", state="complete", expanded=False)
-            result = normalize_bullets(result)
-            st.session_state["report"] = result
-            st.session_state["report_editor"] = result  # 새 결과로 편집창 갱신
+            cases = split_cases(result)
+            st.session_state["cases"] = cases
+            for num, body in cases.items():
+                st.session_state[f"case_editor_{num}"] = body  # 새 결과로 편집창 갱신
             st.session_state["report_date"] = picked_date
             st.session_state["report_author"] = author.strip()
         except anthropic.AuthenticationError as e:
@@ -386,29 +445,43 @@ if st.button("🚀 팀장님 보고서 생성하기", type="primary", use_contai
             st.error(str(e))
 
 # 결과 영역 (버튼을 다시 누르지 않아도 화면에 유지)
-if "report" in st.session_state:
+if "cases" in st.session_state:
+    cases = st.session_state["cases"]
     st.divider()
     st.subheader("📄 완성된 일일 활동보고서")
-    final_text = st.text_area(
-        "필요하면 아래에서 직접 수정한 뒤 복사/다운로드하세요.",
-        height=420,
-        key="report_editor",
-    )
-
+    st.caption("보고 싶은 사례를 체크하세요. 여러 개를 함께 체크하면 나란히 비교할 수 있습니다.")
+    check_cols = st.columns(3)
+    for num, col in zip((1, 2, 3), check_cols):
+        with col:
+            st.checkbox(CASE_LABELS[num], value=(num == 1), key=f"show_{num}", disabled=num not in cases)
     copy_style = st.radio(
         "복사 형식 (카톡에 붙였을 때 보이는 모양)",
         ["- 하이픈", "• 까만 점"],
         horizontal=True,
     )
-    b1, b2 = st.columns(2)
-    with b1:
-        copy_button(for_kakao(final_text, dots=copy_style.startswith("•")))
-    with b2:
-        d = st.session_state["report_date"]
-        st.download_button(
-            "💾 .txt 파일 다운로드",
-            data=final_text.encode("utf-8"),
-            file_name=f"일일보고_{d:%Y%m%d}_{st.session_state['report_author'].replace(' ', '')}.txt",
-            mime="text/plain",
-            use_container_width=True,
-        )
+
+    d = st.session_state["report_date"]
+    who = st.session_state["report_author"].replace(" ", "")
+    shown = [num for num in (1, 2, 3) if num in cases and st.session_state.get(f"show_{num}")]
+    if not shown:
+        st.info("위에서 사례를 하나 이상 체크해 주세요.")
+    for num in shown:
+        with st.container(border=True):
+            st.markdown(f"**{CASE_LABELS[num]}**")
+            text = st.text_area(
+                "필요하면 직접 수정한 뒤 복사/다운로드하세요.",
+                height=380,
+                key=f"case_editor_{num}",
+            )
+            b1, b2 = st.columns(2)
+            with b1:
+                copy_button(for_kakao(text, dots=copy_style.startswith("•")))
+            with b2:
+                st.download_button(
+                    "💾 .txt 파일 다운로드",
+                    data=text.encode("utf-8"),
+                    file_name=f"일일보고_{d:%Y%m%d}_{who}_사례{num}.txt",
+                    mime="text/plain",
+                    use_container_width=True,
+                    key=f"download_{num}",
+                )
